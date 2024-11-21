@@ -21,8 +21,10 @@ spring:
 
 indexing-settings:
   sites:
-    - url: https://fcpsr.ru
-      name: ФЦПСР
+    - url: https://www.svetlovka.ru/
+      name: svetlovka.ru
+    - url: https://ipfran.ru/
+      name: ipfran.ru
 
 user-agent: HeliontSearchBot
 referrer: http://www.google.com

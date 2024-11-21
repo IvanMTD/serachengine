@@ -25,8 +25,20 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<Void> startIndexing() {
+    public ResponseEntity<ResponseMessage> startIndexing() {
+        if(!indexingService.indexingIsShutdown()){
+            return ResponseEntity.ok().body(new ResponseMessage(false,"Индексация уже запущена"));
+        }
         indexingService.indexing();
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body(new ResponseMessage(true,""));
+    }
+
+    @GetMapping("/stopIndexing")
+    public ResponseEntity<ResponseMessage> stopIndexing() {
+        if(indexingService.indexingIsShutdown()){
+            return ResponseEntity.ok().body(new ResponseMessage(false,"Индексация не запущена"));
+        }
+        indexingService.stopIndexing();
+        return ResponseEntity.ok().body(new ResponseMessage(true,""));
     }
 }

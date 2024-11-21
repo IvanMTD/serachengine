@@ -19,16 +19,17 @@ import searchengine.models.Site;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
+import javax.persistence.NonUniqueResultException;
+import javax.transaction.Transactional;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
+
 
 @Slf4j
 @Service
@@ -55,14 +56,19 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public void indexing() {
-        List<RecursiveAction> tasks = new ArrayList<>();
-        for (SiteStruct siteStruct : sites.getSites()) {
-            tasks.add(new IndexingTask(siteStruct));
-        }
+        forkJoinPool.invoke(new IndexingTask());
+        forkJoinPool.shutdown();
+    }
 
-        for (RecursiveAction task : tasks) {
-            forkJoinPool.invoke(task);
-        }
+    @Override
+    public boolean indexingIsShutdown() {
+        boolean check = forkJoinPool.getActiveThreadCount() == 0;
+        return check;
+    }
+
+    @Override
+    public void stopIndexing(){
+        forkJoinPool.shutdownNow();
     }
 
     private void deleteIndexation(Site site) {
@@ -74,38 +80,35 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private class IndexingTask extends RecursiveAction {
-        private final SiteStruct siteStruct;
-
-        public IndexingTask(SiteStruct siteStruct) {
-            this.siteStruct = siteStruct;
-        }
 
         @Override
         protected void compute() {
-            Site site = siteRepository.findByUrl(siteStruct.getUrl());
-            if (site != null) {
-                log.info("site is not null! delete!");
-                deleteIndexation(site);
-            }
-            site = new Site();
-            site.setUrl(siteStruct.getUrl());
-            site.setName(siteStruct.getName());
-            site.setStatus(IndexStatus.INDEXING);
-            site.setStatusTime(LocalDateTime.now());
-            site = siteRepository.save(site);
+            for(SiteStruct siteStruct : sites.getSites()) {
+                Site site = siteRepository.findByUrl(siteStruct.getUrl());
+                if (site != null) {
+                    deleteIndexation(site);
+                }
+                site = new Site();
+                site.setUrl(siteStruct.getUrl());
+                site.setName(siteStruct.getName());
+                site.setStatus(IndexStatus.INDEXING);
+                site.setStatusTime(LocalDateTime.now());
+                site = siteRepository.save(site);
 
-            try {
-                // Запуск рекурсивной индексации страниц
-                new PageIndexingTask(site, "/").invoke(); // Подзадача
-                site.setStatus(IndexStatus.INDEXED);
-                site.setStatusTime(LocalDateTime.now());
-                siteRepository.save(site);
-            } catch (Exception e) {
-                site.setLastError(e.getMessage());
-                site.setStatus(IndexStatus.FAILED);
-                site.setStatusTime(LocalDateTime.now());
-                siteRepository.save(site);
-                log.error("Indexing failed for site: {}", site.getUrl(), e);
+                try {
+                    // Запуск рекурсивной индексации страниц
+                    new PageIndexingTask(site, "/").fork(); // Подзадача
+                    site.setStatus(IndexStatus.INDEXED);
+                    site.setStatusTime(LocalDateTime.now());
+                    siteRepository.save(site);
+                } catch (Exception e) {
+                    String message = "Indexing failed for site: " + site.getUrl() + e.getMessage();
+                    site.setLastError(message);
+                    site.setStatus(IndexStatus.FAILED);
+                    site.setStatusTime(LocalDateTime.now());
+                    siteRepository.save(site);
+                    log.error(message);
+                }
             }
         }
     }
@@ -135,7 +138,6 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         private void indexPage(Site site, String path) throws IOException {
-            log.info("path incoming: {}", path);
             Page page = new Page();
             page.setPath(path);
             page.setSite(site);
@@ -184,12 +186,11 @@ public class IndexingServiceImpl implements IndexingService {
                     for (Element element : elements) {
                         String link = element.absUrl("href");
                         if (link.startsWith(site.getUrl())) {
-                            log.info("found path: {}", link);
                             String relativePath = link.substring(site.getUrl().length());
                             if (pageRepository.findBySiteAndPath(site, relativePath) == null) {
                                 ForkJoinPool joinPool = new ForkJoinPool();
                                 joinPool.invoke(new PageIndexingTask(site, relativePath));
-                                //new PageIndexingTask(site, relativePath).fork();
+                                //indexPage(site,relativePath);
                             }
                         }
                     }

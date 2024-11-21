@@ -17,13 +17,16 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
 
 indexing-settings:
   sites:
-    - url: https://www.lenta.ru
-      name: Лента.ру
-    - url: https://www.skillbox.ru
-      name: Skillbox
-    - url: https://www.playback.ru
-      name: PlayBack.Ru
+    - url: https://fcpsr.ru
+      name: ФЦПСР
+
+user-agent: HeliontSearchBot
+referrer: http://www.google.com
+connection:
+  timeout: 30000
+read:
+  timeout: 30000

@@ -10,4 +10,5 @@ public interface PageRepository extends CrudRepository<Page,Long> {
     List<Page> findAllBySiteId(long id);
     void deleteAllBySite(Site site);
     boolean existsBySiteAndPath(Site site, String url);
+    Page findBySiteAndPath(Site site, String path);
 }

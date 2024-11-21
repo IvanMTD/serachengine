@@ -25,13 +25,8 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<ResponseMessage> startIndexing() {
-        try {
-            indexingService.indexing();  // Запуск индексации
-            return ResponseEntity.ok(new ResponseMessage(true,"Индексация запущена"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseMessage(false,"Ошибка запуска индексации: " + e.getMessage()));
-        }
+    public ResponseEntity<Void> startIndexing() {
+        indexingService.indexing();
+        return ResponseEntity.ok().build();
     }
 }

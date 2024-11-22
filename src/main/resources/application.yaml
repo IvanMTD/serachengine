@@ -21,14 +21,16 @@ spring:
 
 indexing-settings:
   sites:
-    - url: https://www.svetlovka.ru/
-      name: svetlovka.ru
-    - url: https://ipfran.ru/
-      name: ipfran.ru
+    - url: https://www.google.com
+      name: google.com
+    - url: https://www.ya.ru
+      name: yandex
+    - url: https://course.fcpsr.ru
+      name: course
 
 user-agent: HeliontSearchBot
 referrer: http://www.google.com
 connection:
-  timeout: 30000
+  timeout: 10000
 read:
-  timeout: 30000
+  timeout: 10000

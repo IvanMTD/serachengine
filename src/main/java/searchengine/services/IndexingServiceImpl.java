@@ -19,16 +19,13 @@ import searchengine.models.Site;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
-import javax.persistence.NonUniqueResultException;
-import javax.transaction.Transactional;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 @Slf4j
@@ -51,24 +48,32 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Value("${read.timeout:30000}")
     private int readTimeout;
-
-    private final ForkJoinPool forkJoinPool = new ForkJoinPool(); // Один пул на весь процесс
+    private static final AtomicBoolean stopFlag = new AtomicBoolean(false);
+    private ForkJoinPool forkJoinPool = null;
 
     @Override
     public void indexing() {
+        stopFlag.set(false);
+        forkJoinPool = new ForkJoinPool();
         forkJoinPool.invoke(new IndexingTask());
-        forkJoinPool.shutdown();
     }
 
     @Override
     public boolean indexingIsShutdown() {
-        boolean check = forkJoinPool.getActiveThreadCount() == 0;
+        boolean check;
+        if(forkJoinPool == null){
+            check = true;
+        }else{
+            check = false;
+        }
+        log.info("СОСОТОЯНИЕ FORK JOIN: {}", check);
         return check;
     }
 
     @Override
     public void stopIndexing(){
-        forkJoinPool.shutdownNow();
+        forkJoinPool = null;
+        stopFlag.set(true);
     }
 
     private void deleteIndexation(Site site) {
@@ -80,9 +85,9 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private class IndexingTask extends RecursiveAction {
-
         @Override
         protected void compute() {
+            Map<Long,PageIndexingTask> tasks = new HashMap<>();
             for(SiteStruct siteStruct : sites.getSites()) {
                 Site site = siteRepository.findByUrl(siteStruct.getUrl());
                 if (site != null) {
@@ -97,10 +102,9 @@ public class IndexingServiceImpl implements IndexingService {
 
                 try {
                     // Запуск рекурсивной индексации страниц
-                    new PageIndexingTask(site, "/").fork(); // Подзадача
-                    site.setStatus(IndexStatus.INDEXED);
-                    site.setStatusTime(LocalDateTime.now());
-                    siteRepository.save(site);
+                    PageIndexingTask task = new PageIndexingTask(site, "/");
+                    task.fork();
+                    tasks.put(site.getId(),task);
                 } catch (Exception e) {
                     String message = "Indexing failed for site: " + site.getUrl() + e.getMessage();
                     site.setLastError(message);
@@ -110,6 +114,35 @@ public class IndexingServiceImpl implements IndexingService {
                     log.error(message);
                 }
             }
+
+            boolean done = false;
+            while (!done){
+                List<Boolean> doneList = new ArrayList<>();
+                for(Long key : tasks.keySet()){
+                    Optional<Site> optionalSite = siteRepository.findById(key);
+                    if(optionalSite.isPresent()){
+                        Site site = optionalSite.get();
+                        PageIndexingTask task = tasks.get(key);
+                        doneList.add(task.isDone());
+                        if(task.isDone()){
+                            site.setStatus(IndexStatus.INDEXED);
+                            site.setStatusTime(LocalDateTime.now());
+                            siteRepository.save(site);
+                        }
+                    }
+                }
+                int doneCount = tasks.size();
+                for (Boolean taskDone : doneList){
+                    if(taskDone) {
+                        doneCount--;
+                    }
+                }
+                if(doneCount == 0){
+                    done = true;
+                    stopFlag.set(true);
+                }
+            }
+            log.info("ИНДЕКСИНГ ЗАВЕРШЕН!");
         }
     }
 
@@ -124,6 +157,12 @@ public class IndexingServiceImpl implements IndexingService {
 
         @Override
         protected void compute() {
+            if(stopFlag.get()){
+                site.setStatus(IndexStatus.FAILED);
+                site.setStatusTime(LocalDateTime.now());
+                site.setLastError("Индексация остановлена пользователем!");
+                this.cancel(true);
+            }
             try {
                 site.setStatusTime(LocalDateTime.now());
                 siteRepository.save(site);

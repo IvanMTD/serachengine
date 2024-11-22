@@ -1,6 +1,7 @@
 package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 import searchengine.config.SiteStruct;
 import searchengine.config.SitesList;
@@ -13,6 +14,8 @@ import searchengine.models.Site;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
+import java.time.*;
+import java.time.temporal.TemporalField;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +26,9 @@ import java.util.Random;
 public class StatisticsServiceImpl implements StatisticsService {
 
     private final Random random = new Random();
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final IndexingService indexingService;
     private final SitesList sites;
 
     @Override
@@ -36,23 +42,23 @@ public class StatisticsServiceImpl implements StatisticsService {
 
         TotalStatistics total = new TotalStatistics();
         total.setSites(sites.getSites().size());
-        total.setIndexing(true);
+        total.setIndexing(indexingService.indexingIsShutdown());
 
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
-        List<SiteStruct> sitesList = sites.getSites();
+        List<Site> sitesList = siteRepository.findAllBy();
         for(int i = 0; i < sitesList.size(); i++) {
-            SiteStruct site = sitesList.get(i);
+            Site site = sitesList.get(i);
             DetailedStatisticsItem item = new DetailedStatisticsItem();
             item.setName(site.getName());
             item.setUrl(site.getUrl());
-            int pages = random.nextInt(1_000);
-            int lemmas = pages * random.nextInt(1_000);
+            int pages = (int) pageRepository.countBySiteId(site.getId());
+            int lemmas = 0;
             item.setPages(pages);
             item.setLemmas(lemmas);
-            item.setStatus(statuses[i % 3]);
-            item.setError(errors[i % 3]);
-            item.setStatusTime(System.currentTimeMillis() -
-                    (random.nextInt(10_000)));
+            item.setStatus(site.getStatus().toString());
+            item.setError(site.getLastError());
+            LocalDateTime localDateTime = site.getStatusTime();
+            item.setStatusTime(localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli());
             total.setPages(total.getPages() + pages);
             total.setLemmas(total.getLemmas() + lemmas);
             detailed.add(item);

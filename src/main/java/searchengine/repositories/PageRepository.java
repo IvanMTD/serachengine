@@ -11,4 +11,6 @@ public interface PageRepository extends CrudRepository<Page,Long> {
     void deleteAllBySite(Site site);
     boolean existsBySiteAndPath(Site site, String url);
     Page findBySiteAndPath(Site site, String path);
+
+    long countBySiteId(long id);
 }

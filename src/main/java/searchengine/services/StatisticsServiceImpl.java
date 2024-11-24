@@ -11,6 +11,8 @@ import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.enums.IndexStatus;
 import searchengine.models.Site;
+import searchengine.repositories.IndexRepository;
+import searchengine.repositories.LemmaRepository;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
@@ -28,21 +30,16 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final Random random = new Random();
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-    private final IndexingService indexingService;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
+    private final IndexService indexService;
     private final SitesList sites;
 
     @Override
     public StatisticsResponse getStatistics() {
-        String[] statuses = { "INDEXED", "FAILED", "INDEXING" };
-        String[] errors = {
-                "Ошибка индексации: главная страница сайта не доступна",
-                "Ошибка индексации: сайт не доступен",
-                ""
-        };
-
         TotalStatistics total = new TotalStatistics();
         total.setSites(sites.getSites().size());
-        total.setIndexing(indexingService.indexingIsShutdown());
+        total.setIndexing(indexService.isRunning());
 
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         List<Site> sitesList = siteRepository.findAllBy();
@@ -52,13 +49,15 @@ public class StatisticsServiceImpl implements StatisticsService {
             item.setName(site.getName());
             item.setUrl(site.getUrl());
             int pages = (int) pageRepository.countBySiteId(site.getId());
-            int lemmas = 0;
+            int lemmas = lemmaRepository.findAllBySiteId(site.getId()).size();
             item.setPages(pages);
             item.setLemmas(lemmas);
             item.setStatus(site.getStatus().toString());
             item.setError(site.getLastError());
             LocalDateTime localDateTime = site.getStatusTime();
-            item.setStatusTime(localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli());
+            ZoneId moscowZone = ZoneId.of("Europe/Moscow");
+            ZonedDateTime zonedDateTime = localDateTime.atZone(moscowZone);
+            item.setStatusTime(zonedDateTime.toInstant().toEpochMilli());
             total.setPages(total.getPages() + pages);
             total.setLemmas(total.getLemmas() + lemmas);
             detailed.add(item);

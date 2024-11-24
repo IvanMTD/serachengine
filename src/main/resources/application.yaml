@@ -21,12 +21,12 @@ spring:
 
 indexing-settings:
   sites:
-    - url: https://www.google.com
-      name: google.com
-    - url: https://www.ya.ru
-      name: yandex
-    - url: https://course.fcpsr.ru
-      name: course
+    - url: http://www.playback.ru
+      name: playback.ru
+    - url: https://dimonvideo.ru
+      name: dimonvideo.ru
+    - url: https://nikoartgallery.com
+      name: nikoartgallery.com
 
 user-agent: HeliontSearchBot
 referrer: http://www.google.com

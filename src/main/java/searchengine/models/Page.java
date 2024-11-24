@@ -2,7 +2,6 @@ package searchengine.models;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Cascade;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -13,7 +12,7 @@ import java.io.Serializable;
 @Table(
         name = "page",
         indexes = {
-                @Index(name = "idx_path", columnList = "path")
+                @javax.persistence.Index(name = "idx_path", columnList = "path")
         }
 )
 public class Page implements Serializable {

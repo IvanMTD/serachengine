@@ -10,4 +10,6 @@ public interface SiteRepository extends CrudRepository<Site,Long> {
     Site findByUrl(String siteUrl);
 
     List<Site> findAllBy();
+
+    boolean existsByUrl(String url);
 }

@@ -16,6 +16,8 @@ import searchengine.config.SitesList;
 import searchengine.enums.IndexStatus;
 import searchengine.models.Page;
 import searchengine.models.Site;
+import searchengine.repositories.IndexRepository;
+import searchengine.repositories.LemmaRepository;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
@@ -36,6 +38,8 @@ public class IndexingServiceImpl implements IndexingService {
     private final SitesList sites;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
 
     @Value("${user-agent}")
     private String userAgent;
